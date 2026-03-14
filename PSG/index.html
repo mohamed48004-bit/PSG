@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> بلاستيشن هنري     </title>
+    <style>
+        :root {
+            --ps-blue: #003791; --danger: #ff4d4d; --success: #00e676;
+            --warning: #ffab40; --glass: rgba(22, 27, 34, 0.9);
+            --morning: #f1c40f; --night: #9b59b6;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+        body { 
+            margin: 0; padding: 15px; color: white; min-height: 100vh;
+            background: linear-gradient(125deg, #050a18 0%, #001f4d 50%, #050a18 100%);
+            background-size: 200% 200%; animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        @media print {
+            body * { visibility: hidden; }
+            #invoiceArea, #invoiceArea * { visibility: visible; color: black !important; }
+            #invoiceArea { position: fixed; right: 0; top: 0; width: 100%; text-align: center; border:none; }
+            .no-print { display: none !important; }
+        }
+
+        header { text-align: center; padding: 10px; background: rgba(0, 55, 145, 0.2); backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
+        .main-layout { display: grid; grid-template-columns: 3fr 1fr; gap: 15px; }
+        @media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
+
+        .analytics-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .stat-card { background: var(--glass); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .stat-val { display: block; font-size: 1.3rem; font-weight: bold; color: var(--success); }
+
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .device-card { background: var(--glass); border-radius: 20px; padding: 15px; border: 1px solid rgba(255,255,255,0.1); position: relative; transition: 0.3s; }
+        .device-card.active { border-color: var(--ps-blue); box-shadow: 0 0 15px rgba(0, 55, 145, 0.3); }
+
+        .timer { font-size: 2.2rem; text-align: center; color: #00d4ff; font-weight: bold; margin: 5px 0; }
+        button { cursor: pointer; border: none; border-radius: 8px; font-weight: bold; transition: 0.2s; }
+        
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; }
+        .invoice-paper { background: white; color: black; padding: 20px; width: 400px; border-radius: 12px; text-align: center; max-height: 90vh; overflow-y: auto; }
+
+        .admin-btn { width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 10px; font-size: 0.9rem; color: white; }
+        .input-dark { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1rem; }
+        
+        .buffet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
+        .btn-drink { background: #2c3e50; color: white; padding: 6px; font-size: 10px; }
+        .manage-row { display: flex; justify-content: space-between; align-items: center; background: #f0f0f0; padding: 8px; margin-bottom: 5px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<header><h1><span style="color: #ff4000;">    ه</span>نري 🎮</h1></header>
+
+<div class="analytics-bar">
+    <div class="stat-card"><span>صافي اليوم</span><span id="dayTotal" class="stat-val">0</span></div>
+    <div class="stat-card"><span>أرباح الصباح</span><span id="morningTotal" class="stat-val" style="color:var(--warning)">0</span></div>
+    <div class="stat-card"><span>أرباح المساء</span><span id="nightTotal" class="stat-val" style="color:var(--night)">0</span></div>
+</div>
+
+<div class="main-layout">
+    <div class="grid-container" id="mainGrid"></div>
+    <div class="sidebar">
+        <div style="background:var(--glass); padding:15px; border-radius:15px; border:1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin:0; color:var(--success); text-align:center;">💵 الخزينة: <span id="cashTotalDisplay">0</span> ج</h3>
+            <hr style="opacity:0.1; margin:15px 0;">
+            <button class="admin-btn" style="background:var(--warning); color:black;" onclick="showShiftCheckout()">🏁 تقفيل وردية (شيفت)</button>
+            <button class="admin-btn" style="background:var(--ps-blue);" onclick="openMenuEditor()">☕ إدارة المنيو والأسعار</button>
+            <button class="admin-btn" style="background:#6c5ce7;" onclick="openDeviceManager()">🖥️ إدارة الأجهزة</button>
+            <button class="admin-btn" style="background:var(--danger);" onclick="openExpenseManager()">💸 إضافة مصروفات</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-overlay">
+    <div class="invoice-paper" id="invoiceArea"></div>
+</div>
+
+<script>
+    const HOURLY_RATE = 30;
+    const ADMIN_PASS = "123";
+    
+    let menu = JSON.parse(localStorage.getItem('ps_menu')) || [{id: 1, n:"بيبسي", p:15}];
+    let cashBalance = parseFloat(localStorage.getItem('current_cash')) || 0;
+    let history = JSON.parse(localStorage.getItem('ps_history')) || [];
+    let expenses = JSON.parse(localStorage.getItem('ps_expenses')) || [];
+    let devices = JSON.parse(localStorage.getItem('ps_devices')) || Array.from({length: 6}, (_, i) => ({ 
+        id: i+1, name: `جهاز ${i+1}`, status: 'idle', seconds: 0, buffet: 0 
+    }));
+
+    // إعادة ضبط timers
+    devices.forEach(d => { d.timer = null; if(d.status === 'running') startTimer(d.id); });
+
+    function render() {
+        const grid = document.getElementById('mainGrid');
+        grid.innerHTML = '';
+        devices.forEach(dev => {
+            const timeCost = (dev.seconds / 3600) * HOURLY_RATE;
+            const totalNow = timeCost + dev.buffet;
+            grid.innerHTML += `
+                <div class="device-card ${dev.status !== 'idle' ? 'active' : ''}">
+                    <div style="display:flex; justify-content:space-between;"><b>${dev.name}</b><b style="color:var(--success)">${totalNow.toFixed(1)} ج</b></div>
+                    <div class="timer">${formatTime(dev.seconds)}</div>
+                    ${dev.status === 'idle' ? 
+                        `<button onclick="start(${dev.id})" style="background:var(--success); width:100%; padding:10px;">بدء مفتوح</button>` : 
+                        `<div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+                            <button onclick="prepareInvoice(${dev.id})" style="background:var(--ps-blue); color:white; padding:8px;">حساب 🖨️</button>
+                            <button onclick="moveOrMerge(${dev.id})" style="background:var(--warning); color:black; padding:8px;">نقل/دمج 🔄</button>
+                            <button onclick="resetDevice(${dev.id})" style="background:var(--danger); color:white; padding:8px; grid-column: span 2;">إلغاء</button>
+                        </div>`
+                    }
+                    <div class="buffet-grid">${menu.map(m => `<button class="btn-drink" onclick="addBuffet(${dev.id}, ${m.p})">${m.n}</button>`).join('')}</div>
+                </div>`;
+        });
+        document.getElementById('cashTotalDisplay').innerText = cashBalance.toFixed(1);
+        updateAnalytics();
+        saveData();
+    }
+
+    function saveData() {
+        localStorage.setItem('current_cash', cashBalance);
+        localStorage.setItem('ps_menu', JSON.stringify(menu));
+        localStorage.setItem('ps_devices', JSON.stringify(devices.map(({timer, ...rest}) => rest)));
+        localStorage.setItem('ps_history', JSON.stringify(history));
+    }
+
+    // --- وظائف الوقت ---
+    function start(id) {
+        const d = devices.find(x => x.id === id);
+        if(d.status === 'idle') { d.status = 'running'; startTimer(id); render(); }
+    }
+    function startTimer(id) {
+        const d = devices.find(x => x.id === id);
+        if(d.timer) clearInterval(d.timer);
+        d.timer = setInterval(() => { d.seconds++; render(); }, 1000);
+    }
+    function resetDevice(id) {
+        const d = devices.find(x => x.id === id);
+        clearInterval(d.timer);
+        Object.assign(d, { status: 'idle', seconds: 0, buffet: 0, timer: null });
+        render();
+    }
+
+    // --- نقل ودمج ---
+    function moveOrMerge(fromId) {
+        const target = prompt("رقم الجهاز المستهدف:");
+        const toDev = devices.find(d => d.id == target);
+        if(!toDev || toDev.id == fromId) return alert("جهاز غير موجود");
+        const fromDev = devices.find(d => d.id === fromId);
+        if(toDev.status === 'idle'){
+            toDev.seconds = fromDev.seconds; toDev.buffet = fromDev.buffet;
+            toDev.status = 'running'; startTimer(toDev.id);
+        } else {
+            if(confirm("دمج الحسابين؟")){ toDev.seconds += fromDev.seconds; toDev.buffet += fromDev.buffet; } else return;
+        }
+        resetDevice(fromId);
+    }
+
+    // --- إدارة الأجهزة ---
+    function openDeviceManager() {
+        if (prompt("كلمة السر:") !== ADMIN_PASS) return;
+        let html = `<h3>🖥️ إدارة الأجهزة</h3>
+            <button onclick="addNewDevice()" style="background:var(--success); color:white; width:100%; padding:10px; margin-bottom:15px;">إضافة جهاز جديد +</button>
+            <div style="max-height:300px; overflow-y:auto;">`;
+        devices.forEach(d => {
+            html += `<div class="manage-row">
+                <input type="text" value="${d.name}" onchange="renameDevice(${d.id}, this.value)" style="width:120px; padding:4px;">
+                <button onclick="deleteDevice(${d.id})" style="background:var(--danger); color:white; padding:4px 8px;">حذف</button>
+            </div>`;
+        });
+        html += `</div><button onclick="closeModal()" style="width:100%; margin-top:10px; background:#333; color:white;">إغلاق</button>`;
+        document.getElementById('invoiceArea').innerHTML = html;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+    function addNewDevice() {
+        const newId = devices.length > 0 ? Math.max(...devices.map(d => d.id)) + 1 : 1;
+        devices.push({ id: newId, name: `جهاز ${newId}`, status: 'idle', seconds: 0, buffet: 0, timer: null });
+        render(); openDeviceManager();
+    }
+    function renameDevice(id, newName) { devices.find(d => d.id === id).name = newName; render(); }
+    function deleteDevice(id) {
+        if (devices.find(d => d.id === id).status !== 'idle') return alert("الجهاز يعمل حالياً!");
+        devices = devices.filter(d => d.id !== id); render(); openDeviceManager();
+    }
+
+    // --- الحسابات والمنيو ---
+    function prepareInvoice(id) {
+        const d = devices.find(x => x.id === id);
+        const timeCost = (d.seconds / 3600) * HOURLY_RATE;
+        const total = timeCost + d.buffet;
+        document.getElementById('invoiceArea').innerHTML = `<h2>فاتورة ${d.name}</h2><hr>
+            <p>وقت: ${formatTime(d.seconds)} (${timeCost.toFixed(1)}ج)</p>
+            <p>طلبات: ${d.buffet.toFixed(1)}ج</p>
+            <h1 style="border:2px solid #000; padding:10px;">الإجمالي: ${total.toFixed(1)} ج</h1>
+            <button onclick="confirmPay(${id}, ${total})" style="background:var(--success); width:100%; padding:15px; color:white;">تحصيل ✅</button>
+            <button onclick="closeModal()" style="width:100%; margin-top:10px; background:none;">رجوع</button>`;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+    function confirmPay(id, total) { window.print(); cashBalance += total; resetDevice(id); closeModal(); }
+    function addBuffet(id, p) { const d = devices.find(x => x.id === id); if(d.status !== 'idle'){ d.buffet += p; render(); } }
+
+    function openMenuEditor() {
+        if (prompt("الباسورد:") !== ADMIN_PASS) return;
+        let html = `<h3>☕ المنيو</h3><input type="text" id="mN" placeholder="الاسم" class="input-dark"><input type="number" id="mP" placeholder="السعر" class="input-dark">
+        <button onclick="addM()" style="background:var(--success); color:white; width:100%; padding:10px;">إضافة</button><hr>`;
+        menu.forEach(m => { html += `<div class="manage-row"><span>${m.n}</span><button onclick="delM(${m.id})" style="background:var(--danger); color:white;">حذف</button></div>`; });
+        document.getElementById('invoiceArea').innerHTML = html + `<button onclick="closeModal()" style="width:100%; margin-top:10px;">إغلاق</button>`;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+    function addM() { const n=document.getElementById('mN').value, p=parseFloat(document.getElementById('mP').value); if(n && p>=0){ menu.push({id:Date.now(), n, p}); openMenuEditor(); render(); } }
+    function delM(id) { menu = menu.filter(m => m.id !== id); openMenuEditor(); render(); }
+
+    function openExpenseManager() {
+        document.getElementById('invoiceArea').innerHTML = `<h3>💸 مصروفات</h3><input type="number" id="eA" class="input-dark" placeholder="المبلغ"><input type="text" id="eR" class="input-dark" placeholder="السبب">
+        <button onclick="saveE()" style="background:var(--danger); color:white; width:100%; padding:10px;">خصم</button>`;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+    function saveE() { const a=parseFloat(document.getElementById('eA').value); if(a>0){ cashBalance-=a; closeModal(); render(); } }
+
+    function showShiftCheckout() {
+        if (prompt("الباسورد:") !== ADMIN_PASS) return;
+        document.getElementById('invoiceArea').innerHTML = `<h3>🏁 تقفيل شيفت</h3><p>كاش: ${cashBalance.toFixed(1)}</p>
+        <button onclick="endS('صباحي')" style="background:var(--morning); width:100%; padding:15px; margin-bottom:10px;">صباحي</button>
+        <button onclick="endS('مسائي')" style="background:var(--night); color:white; width:100%; padding:15px;">مسائي</button>`;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+    function endS(t) { history.push({date: new Date().toISOString(), amount: cashBalance, shiftType: t}); cashBalance=0; closeModal(); render(); }
+
+    function updateAnalytics() {
+        const now = new Date();
+        const daily = history.filter(h => (now - new Date(h.date)) < 86400000);
+        document.getElementById('dayTotal').innerText = daily.reduce((a,b)=> a+b.amount,0).toFixed(0) + " ج";
+        document.getElementById('morningTotal').innerText = daily.filter(h=> h.shiftType==='صباحي').reduce((a,b)=> a+b.amount,0).toFixed(0) + " ج";
+        document.getElementById('nightTotal').innerText = daily.filter(h=> h.shiftType==='مسائي').reduce((a,b)=> a+b.amount,0).toFixed(0) + " ج";
+    }
+
+    function formatTime(s) { return `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor((s%3600)/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+    function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+    render();
+</script>
+</body>
+</html>
